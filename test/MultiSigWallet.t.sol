@@ -26,8 +26,7 @@ contract MultiSigWalletTest is Test {
         vm.label(address(this), "Tester");
 
         multiSigWallet = new MultiSigWallet(_owners, 2);
-        (bool success, ) = payable(multiSigWallet).call{value: 0.1 ether}("");
-        require(success, "external contract call failed");
+        vm.deal(address(multiSigWallet), 0.1 ether);
         multiSigWallet.submitTx(address(rick), 0.1 ether, bytes("0x8888"));
     }
 
