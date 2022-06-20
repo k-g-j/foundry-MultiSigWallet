@@ -151,10 +151,7 @@ contract MultiSigWallet {
         }
     }
 
-    function getTransaction(uint256 _txId) external view returns (Transaction memory) {
-        if (_txId > txId) {
-            revert TxDoesNotExist();
-        }
+    function getTransaction(uint256 _txId) external view txExists(_txId) returns (Transaction memory) {
         return transactions[_txId];
     }
 
