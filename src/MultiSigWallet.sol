@@ -33,7 +33,7 @@ contract MultiSigWallet {
     }
 
     modifier txExists(uint256 _txId) {
-        if (_txId > txId) {
+        if (_txId > txId - 1) {
             revert TxDoesNotExist();
         }
         _;
@@ -79,6 +79,7 @@ contract MultiSigWallet {
             }
             isOwner[owner] = true;
         }
+        required = _required;
     }
 
     receive() external payable {
