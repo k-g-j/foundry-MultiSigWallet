@@ -3,10 +3,11 @@
 pragma solidity ^0.8.7;
 
 contract MultiSigWallet {
-    event Deposit(address sender, uint256 value, uint256 balance);
-    event SubmittedTx(address to, uint256 value, bytes data);
-    event ApprovedTx(uint256 txId, address approver);
-    event TxExecuted(address to, uint256 value, bytes data, address executor);
+    event Deposit(address indexed sender, uint256 indexed value, uint256 balance);
+    event SubmittedTx(address indexed to, uint256 indexed value, bytes indexed data);
+    event ApprovedTx(uint256 indexed txId, address indexed approver);
+    event RevokeApproval(address indexed owner, uint indexed txId);
+    event TxExecuted(address indexed to, uint256 indexed value, bytes indexed data, address executor);
 
     mapping(address => bool) private isOwner;
 
@@ -137,7 +138,7 @@ contract MultiSigWallet {
         );
     }
 
-    function revokeTx(uint256 _txId)
+    function revokeApproval(uint256 _txId)
         external
         onlyOwner
         txExists(_txId)
@@ -149,6 +150,7 @@ contract MultiSigWallet {
         } else {
             revert TxNotApproved();
         }
+        emit RevokeApproval(msg.sender, _txId);
     }
 
     function getTransaction(uint256 _txId) external view txExists(_txId) returns (Transaction memory) {

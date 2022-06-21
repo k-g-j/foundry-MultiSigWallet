@@ -5,10 +5,24 @@ import "forge-std/Test.sol";
 import "../src/MultiSigWallet.sol";
 
 contract MultiSigWalletTest is Test {
-    event Deposit(address sender, uint256 value, uint256 balance);
-    event SubmittedTx(address to, uint256 value, bytes data);
-    event ApprovedTx(uint256 txId, address approver);
-    event TxExecuted(address to, uint256 value, bytes data, address executor);
+    event Deposit(
+        address indexed sender,
+        uint256 indexed value,
+        uint256 balance
+    );
+    event SubmittedTx(
+        address indexed to,
+        uint256 indexed value,
+        bytes indexed data
+    );
+    event ApprovedTx(uint256 indexed txId, address indexed approver);
+    event RevokeApproval(address indexed owner, uint indexed txId);
+    event TxExecuted(
+        address indexed to,
+        uint256 indexed value,
+        bytes indexed data,
+        address executor
+    );
 
     address rick = address(0x1234);
     address morty = address(0x5678);
@@ -54,7 +68,7 @@ contract MultiSigWalletTest is Test {
     }
 
     function test__receiveFallbackEvent() public {
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(true, true, false, true);
         (bool success, ) = payable(multiSigWallet).call{value: 0.2 ether}("");
         require(success, "external contract call failed");
         emit Deposit(address(this), 0.2 ether, address(multiSigWallet).balance);
@@ -77,7 +91,7 @@ contract MultiSigWalletTest is Test {
     }
 
     function test__submitTxEvent() public {
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(true, true, true, true);
         multiSigWallet.submitTx(address(morty), 0.3 ether, bytes("0x4444"));
         emit SubmittedTx(address(morty), 0.3 ether, bytes("0x4444"));
     }
@@ -116,7 +130,7 @@ contract MultiSigWalletTest is Test {
     }
 
     function test_approveTxEvent() public {
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(true, true, false, true);
         multiSigWallet.approveTx(0);
         emit ApprovedTx(0, address(this));
     }
@@ -161,7 +175,7 @@ contract MultiSigWalletTest is Test {
         multiSigWallet.approveTx(0);
         vm.prank(rick);
         multiSigWallet.approveTx(0);
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(true, true, true, true);
         multiSigWallet.executeTx(0);
         emit TxExecuted(
             address(rick),
@@ -169,5 +183,64 @@ contract MultiSigWalletTest is Test {
             bytes("0x8888"),
             address(this)
         );
+    }
+
+    function test__revokeApprovalOnlyOwner() public {
+        vm.prank(elon);
+        vm.expectRevert(MultiSigWallet.NotOwner.selector);
+        multiSigWallet.revokeApproval(0);
+    }
+
+    function test__revokeApprovalTxExists() public {
+        vm.expectRevert(MultiSigWallet.TxDoesNotExist.selector);
+        multiSigWallet.revokeApproval(1);
+    }
+
+    function test__revokeApprovalTxNotExecuted() public {
+        multiSigWallet.approveTx(0);
+        vm.prank(rick);
+        multiSigWallet.approveTx(0);
+        multiSigWallet.executeTx(0);
+        vm.expectRevert(MultiSigWallet.TxAlreadyExecuted.selector);
+        multiSigWallet.revokeApproval(0);
+    }
+
+    function test__revokeApprovalTxNotApproved() public {
+        vm.expectRevert(MultiSigWallet.TxNotApproved.selector);
+        multiSigWallet.revokeApproval(0);
+    }
+
+    function test__revokeApproval() public {
+        multiSigWallet.approveTx(0);
+        assertEq(multiSigWallet.getTransaction(0).confirmations, 1);
+        assertTrue(multiSigWallet.checkApproved(0, address(this)));
+        multiSigWallet.revokeApproval(0);
+        assertEq(multiSigWallet.getTransaction(0).confirmations, 0);
+        assertFalse(multiSigWallet.checkApproved(0, address(this)));
+    }
+
+    function test__revokeApprovalEvent() public {
+        multiSigWallet.approveTx(0);
+        vm.expectEmit(true, true, false, true);
+        multiSigWallet.revokeApproval(0);
+        emit RevokeApproval(address(this), 0);
+    }
+
+    function testFuzz__approveTx(uint256 _txId) public {
+        vm.assume(_txId > 0);
+        vm.expectRevert(MultiSigWallet.TxDoesNotExist.selector);
+        multiSigWallet.approveTx(_txId);
+    }
+
+    function testFuzz__executeTx(uint256 _txId) public {
+        vm.assume(_txId > 0);
+        vm.expectRevert(MultiSigWallet.TxDoesNotExist.selector);
+        multiSigWallet.executeTx(_txId);
+    }
+
+    function testFuzz__revokeApproval(uint256 _txId) public {
+        vm.assume(_txId > 0);
+        vm.expectRevert(MultiSigWallet.TxDoesNotExist.selector);
+        multiSigWallet.revokeApproval(_txId);
     }
 }
